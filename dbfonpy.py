@@ -4,6 +4,7 @@
 @version: 0.0.1
 @python: 2.6
 @license: free for any use
+@warranty: no warranty at all
 
 --------------------------------------------------------------------------------
 --- MANUAL ---------------------------------------------------------------------
@@ -19,7 +20,6 @@ deleted.
 
 First column in dataset contains info about delete flag, but it has to be
 transparent to user! For user data always begins with index 0 not 1!
-
 
 --------------------------------------------------------------------------------
 --- EXAMPLES -------------------------------------------------------------------
@@ -69,11 +69,8 @@ cursor.descriptionDbf2
 #   (colname3, length, type, decimal),
 # )
 
-
 conn.commit('newfile.dbf')
 # Saves file. If no name is given saves changes to current file.
-
-
 
 LINKS:
 http://code.activestate.com/recipes/362715/
@@ -88,8 +85,6 @@ import math
 import struct
 import re
 
-DBFONPY_DEBUG = False
-
 class DbfOnPyError(Exception):
     pass
 
@@ -99,8 +94,8 @@ class DbfOnPyDataError(Exception):
 class DbfOnPySqlError(Exception):
     pass
 
-def connect(f, cols = []):
-    return DbfOnPy(f, cols)
+def connect(f, cols=None):
+    return Connection(f, cols)
 
 class Cursor():
     def __init__(self, parent):
@@ -135,11 +130,23 @@ class Cursor():
         self.descriptionDbf2 = tuple(set3)
     
     def __analyzeSqlQuery(self, query):
-        """ method analyzes sql query and overwrites selectiing methods"""
-        sqlQuery = query.lower().strip()
+        """\
+        Method analyzes sql query and overwrites selecting methods.
+        Methods: fetone(), fetchall(), next() are overwritten at runtime.
+        It allows to spped up selecting of data.
+        
+        This method should be moved to sepearate class in the future
+        """
+        sqlQuery = query.lower().strip().rstrip(';').rstrip()
         sqlQuery = re.sub('\s+', ' ', sqlQuery)
         
-        if sqlQuery == 'select * from dbf' or sqlQuery == '':
+        if sqlQuery == 'delete from dbf':
+            self.zap()
+            
+        elif sqlQuery == 'commit':
+            self.__parent.commit()
+            
+        elif sqlQuery == 'select * from dbf' or sqlQuery == '':
             # fetch all records (default)
             def next():
                 if self.__cnt >= len(self.__dataset):
@@ -228,10 +235,10 @@ class Cursor():
             )
     
     def fetchone(self):
-        pass
+        return None
     
     def fetchall(self):
-        pass
+        return []
     
     def rowcount(self):
         return len(self.__dataset)
@@ -244,23 +251,26 @@ class Cursor():
         return self
     
     def next(self):
-        pass
+        raise StopIteration
     
     # *********************
     # dbf specific options
     # *********************
     def delete(self):
+        """ Mark current record as deleted """
         self.__dataset[self.__cnt - 1][0] = True
     
     def undelete(self):
+        """ Mark current record as not deleted """
         self.__dataset[self.__cnt - 1][0] = False
     
     def zap(self):
+        """ Marks all records as deleted """
         for i in xrange(len(self.__dataset)):
             self.__dataset[i][0] = True
     
     def pack(self):
-        """ remove all records marked as deleted """
+        """ Remove all records marked as deleted. """
         # go from end to begin to avoid reindexing issues
         i = len(self.__dataset) - 1
         while i >= 0:
@@ -344,15 +354,14 @@ class Cursor():
             return n
         raise DbfOnPyDataError('Invalid value (%s) for NUMERIC column. Expecting length: %s, decimal: %s' % (n,nlen,ndecimal))
 
-class DbfOnPy:
-
+class Connection:
     #########################################################
     # section: basic methods
     #########################################################
     
     def __init__(self, fname, cols):
         # jesli jest cols to znaczy ze masz stworzyc nowa pusta baze danych
-        if len(cols) > 0:
+        if cols != None:
             self.__createEmptyDB(fname, cols)
         
         # te zmienne sluza do porownan, zeby nie tworzyc obiektow
@@ -374,9 +383,6 @@ class DbfOnPy:
         self.currentFileName = fname;
         
         f = open(fname, 'rb')
-        
-        if DBFONPY_DEBUG:
-            debug_lastTimer = time.time()
         
         '''# header
         self.header = {
@@ -403,10 +409,6 @@ class DbfOnPy:
         self.header['reserved2']
         ) = struct.unpack('<c3sIHH16scc2s', f.read(32))
         
-        if DBFONPY_DEBUG:
-            print "Header fetch time: " + str(time.time() - debug_lastTimer)
-            debug_lastTimer = time.time()
-        
         # record set
         while 1:
             if f.read(1) == '\x0d':
@@ -429,13 +431,9 @@ class DbfOnPy:
                     }
                 )
         
-        if DBFONPY_DEBUG:
-            print "Records info fetch time: " + str(time.time() - debug_lastTimer)
-            debug_lastTimer = time.time()
-        
         # skip terminator 0x0d and database container 0x00
-        f.read(2) 
-
+        f.read(2)
+        
         # data
         
         ##### PREKOMPILACJA #######
@@ -475,8 +473,6 @@ class DbfOnPy:
                 appendfuncdynamic(self, dbfLine)
         f.close()
         
-        if DBFONPY_DEBUG:
-            print "Data fetch time: " + str(time.time() - debug_lastTimer)
     ### /__init__()
     
     def __createEmptyDB(self, fname, cols):
@@ -783,7 +779,6 @@ class DbfOnPy:
 #FFFFFFFFFFFFFFUUUUUUUUUUUUUUUU-
 ################################
 
-
 if __name__ == '__main__':
     
     # print __debug__
@@ -802,8 +797,6 @@ if __name__ == '__main__':
     
     c.execute('select * from dbf where deleted = false')
     print c.fetchall()
-    
-
     
     exit()
     dbu = connect('karty.dbf')
