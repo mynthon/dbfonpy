@@ -132,10 +132,8 @@ class Cursor():
     def __analyzeSqlQuery(self, query):
         """\
         Method analyzes sql query and overwrites selecting methods.
-        Methods: fetone(), fetchall(), next() are overwritten at runtime.
+        Methods: fetchone(), fetchall(), next() are overwritten at runtime.
         It allows to spped up selecting of data.
-        
-        This method should be moved to sepearate class in the future
         """
         sqlQuery = query.lower().strip().rstrip(';').rstrip()
         sqlQuery = re.sub('\s+', ' ', sqlQuery)
@@ -144,7 +142,7 @@ class Cursor():
             self.zap()
             
         elif sqlQuery == 'commit':
-            self.__parent.commit()
+            self.self.commit()
             
         elif sqlQuery == 'select * from dbf' or sqlQuery == '':
             # fetch all records (default)
@@ -167,7 +165,7 @@ class Cursor():
                 else:
                     self.__cnt += 1
                     return self.__dataset[self.__cnt - 1]
-            self.fetchone = self.fetchone
+            self.fetchone = fetchone
             
         elif sqlQuery == 'select * from dbf where delete_flag = true':
             # fetch all deleted rows
@@ -194,7 +192,7 @@ class Cursor():
                         self.__cnt += 1
                         if self.__dataset[self.__cnt - 1][0] == True:
                             return self.__dataset[self.__cnt - 1]
-            self.fetchone = self.fetchone
+            self.fetchone = fetchone
             
         elif sqlQuery == 'select * from dbf where delete_flag = false':
             # fetch all not deleted rows
@@ -221,7 +219,7 @@ class Cursor():
                         self.__cnt += 1
                         if self.__dataset[self.__cnt - 1][0] == False:
                             return self.__dataset[self.__cnt - 1]
-            self.fetchone = self.fetchone
+            self.fetchone = fetchone
             
         else:
             raise DbfOnPySqlError(
@@ -360,6 +358,8 @@ class Connection:
     #########################################################
     
     def __init__(self, fname, cols):
+        self.version = '0.0.20100510.1.alpha'
+        
         # jesli jest cols to znaczy ze masz stworzyc nowa pusta baze danych
         if cols != None:
             self.__createEmptyDB(fname, cols)
@@ -632,21 +632,6 @@ class Connection:
         return Cursor(self)
     
     #########################################################
-    # section: data manipulation and user output
-    #########################################################
-    
-    def createIndex(self, colNum):
-        """
-        ooooold idea - not use this method
-        """
-        i = 0
-        dl = len(self.dataset[0])
-        while i < dl:
-            if not self.idx[0].has_key(self.dataset[colNum + 1][i]):
-                self.idx[0][self.dataset[colNum + 1][i]] = []
-        self.idx[0][self.dataset[colNum + 1][i]].append(i)
-
-    #########################################################
     # section: data formatting methods
     # _put_ methods translates data from column format to file
     # _get_ methods translates data from file to column format
@@ -771,106 +756,3 @@ class Connection:
             print self._byteToInt_(self.header['positionFirstData'])
         else:
             self.header["positionFirstData"] = self._intToByte_(position,2)   
-
-
-################################
-################################
-################################
-#FFFFFFFFFFFFFFUUUUUUUUUUUUUUUU-
-################################
-
-if __name__ == '__main__':
-    
-    # print __debug__
-    #dbu = connect('KARTY.DBF')
-    
-    dbu = connect('tests/TEST1sql1.dbf')
-    c = dbu.cursor()
-    c.execute()
-    print c.fetchall()
-    
-    c.execute('select * from dbf where deleted = false')
-    print c.fetchall()
-    
-    c.execute('select * from dbf where deleted = true')
-    print c.fetchall()
-    
-    c.execute('select * from dbf where deleted = false')
-    print c.fetchall()
-    
-    exit()
-    dbu = connect('karty.dbf')
-    c = dbu.cursor();
-    print 'db'
-    import sqlite3
-    
-    sql = sqlite3.connect('dbfonpy/temp.db')
-    sqlc = sql.cursor()
-    print 'sql'
-    for r1,r2,r3,r4 in c:
-        sqlc.execute('INSERT INTO TEMP VALUES (?,?,?)', [r2,r3,r4])
-    
-    raise SystemExit
-    
-    cols = (
-        ('col1', 'N', 8, 2),
-        ('col2', 'C', 20),
-        ('col3', 'L')
-    )
-    
-    dbu = connect('test3.dbf', cols)
-    c = dbu.cursor()
-    
-    c.insert([20.46, 'column1', True])
-    c.insert([189.89, 'column2', True])
-    c.insert([1223.7, 'column3', False])
-    
-    dbu.commit()
-    raise SystemExit
-    
-    #dbu = connect('INTERNET.DBF')
-    dbu = connect('test.DBF')
-    
-    print dbu.recordset[0]
-    print dbu.recordset[1]
-    print dbu.recordset[2]
-    print dbu.recordset[3]
-    
-    #raise SystemExit
-    curs = dbu.cursor()
-    print '-----------------'
-    for row in curs:
-        print row
-    print '-----------------'
-    
-    print 'description:'
-    print curs.description
-    print 'description dbf:'
-    print curs.descriptionDbf
-    print 'description dbf2:'
-    print curs.descriptionDbf2
-    print 'insert'
-    curs.insert(['a', 1, True, '20080901', 'b', 23])
-    curs.insert(['rekord', 12346.7898, False, '20080901', 'xxpp', 3])
-    curs.insert(['rekordx', 12345.7897, ' ', '20080901', 'xxpp', 3])
-    curs.insert(['rekordy', -1234.7897, ' ', '20080901', 'xxiiii', 3])
-    print 'rowcount'
-    print curs.rowcount
-    print 'num of records (heder)'
-    print dbu.header['numberOfRecords']
-    print 'commit'
-    dbu.commit('test2.dbf')
-    raise SystemExit
-    
-    tWork = time.time()
-    print "loop start: " + str(tWork)
-    
-    for i in curs:
-        print i
-    
-    tWork = time.time() - tWork
-    print "loop end: " + str(tWork)
-    
-    curs.pack()
-    
-

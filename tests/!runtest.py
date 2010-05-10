@@ -180,6 +180,17 @@ if 1:
         print 'WRONG SQL FAIL'
     except(dbfonpy.DbfOnPySqlError):
         print 'WRONG SQL OK'
+        
+    print ('\nPRINT ROWS (4 expected):')
+    i = 0
+    c.execute('select * from dbf')
+    for row in c.fetchall():
+        print row
+        i += 1
+    if i == 4:
+        print '4 of 4 OK'
+    else:
+        print '%s of 4 - FAIL' % i
     
     print 'Test end.'
 
