@@ -1,4 +1,5 @@
 import imp
+import decimal
 dbfonpy = imp.load_source('dbfonpy', '../dbfonpy.py')
 
 def compareFiles(f1, f2):
@@ -42,9 +43,9 @@ if 1:
     
     i = 0
     testdata = (
-        ('This is FIRST RECORD',1234567890,1234.5678,True,'19310912'),
-        ('This is record number 2',12,5.0,' ','19791231'),
-        ('This is third record',1,12.6,False,'19990130')
+        ('This is FIRST RECORD',1234567890,decimal.Decimal('1234.5678'),True,'19310912'),
+        ('This is record number 2',12,decimal.Decimal('5.0'),' ','19791231'),
+        ('This is third record',1,decimal.Decimal('12.6'),False,'19990130')
     )
     for row in c:
         for j in xrange(len(testdata[i])):
@@ -76,9 +77,9 @@ if 1:
     
     i = 0
     testdata = (
-        ('This is FIRST RECORD',1234567890,1234.5678,True,'19310912'),
-        ('This is record number 2',12,5.0,' ','19791231'),
-        ('This is third record',1,12.6,False,'19990130')
+        ('This is FIRST RECORD',1234567890,decimal.Decimal('1234.5678'),True,'19310912'),
+        ('This is record number 2',12,decimal.Decimal('5.0'),' ','19791231'),
+        ('This is third record',1,decimal.Decimal('12.6'),False,'19990130')
     )
     for row in c:
         for j in xrange(len(testdata[i])):
@@ -107,11 +108,11 @@ if 1:
     )
     conn = dbfonpy.connect('test1cn.dbf', columns)
     c = conn.cursor()
-    c.insert(['This is FIRST RECORD',1234567890,1234.5678,True,'19310912'])
-    c.insert(['This is record number 2',12,5.0,' ','19791231'])
-    c.insert(['This is third record',1,12.6,False,'19990130'])
+    c.insert(['This is FIRST RECORD',1234567890,decimal.Decimal('1234.5678'),True,'19310912'])
+    c.insert(['This is record number 2',12,decimal.Decimal('5.0'),' ','19791231'])
+    c.insert(['This is third record',1,decimal.Decimal('12.6'),False,'19990130'])
     conn.commit()
-    
+
     compareFiles('test1cn.dbf', 'test1exp.dbf')
     
     conn = dbfonpy.connect('test1cn.dbf')
@@ -120,9 +121,9 @@ if 1:
     
     i = 0
     testdata = (
-        ('This is FIRST RECORD',1234567890,1234.5678,True,'19310912'),
-        ('This is record number 2',12,5.0,' ','19791231'),
-        ('This is third record',1,12.6,False,'19990130')
+        ('This is FIRST RECORD',1234567890,decimal.Decimal('1234.5678'),True,'19310912'),
+        ('This is record number 2',12,decimal.Decimal('5.0'),' ','19791231'),
+        ('This is third record',1,decimal.Decimal('12.6'),False,'19990130')
     )
     for row in c:
         for j in xrange(len(testdata[i])):

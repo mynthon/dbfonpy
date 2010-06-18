@@ -84,6 +84,7 @@ import sys
 import math
 import struct
 import re
+import decimal
 
 class DbfOnPyError(Exception):
     pass
@@ -99,24 +100,24 @@ def connect(f, cols=None):
 
 class Cursor():
     def __init__(self, parent):
-        self.__parent = parent
-        self.__cnt = 0
-        self.__dataset = parent.dataset
-        self.__recordset = parent.recordset
+        self._parent = parent
+        self._cnt = 0
+        self._dataset = parent._dataset
+        self._recordset = parent._recordset
         self.description = None
         self.descriptionDbf = None
         self.descriptionDbf2 = None
-        self.__description()
-        self.rowcount = len(self.__dataset)
+        self._description()
+        self.rowcount = len(self._dataset)
     
-    def __description(self):
+    def _description(self):
         set = [] # py db api
         set2 = [] # colnames only
         set3 = [] # column full info (name, len, type, decimal)
         set.append(('MARKED_FOR_DELETE',None,None,None,None,None,None))
         set2.append('MARKED_FOR_DELETE')
         set3.append(('MARKED_FOR_DELETE', 1, '', 0))
-        for record in self.__recordset:
+        for record in self._recordset:
             set.append((record['name'],None,None,None,None,None,None))
             set2.append(record['name'])
             set3.append((
@@ -147,78 +148,78 @@ class Cursor():
         elif sqlQuery == 'select * from dbf' or sqlQuery == '':
             # fetch all records (default)
             def next():
-                if self.__cnt >= len(self.__dataset):
-                    self.__cnt = 0
+                if self._cnt >= len(self._dataset):
+                    self._cnt = 0
                     raise StopIteration
                 else:
-                    self.__cnt += 1
-                    return self.__dataset[self.__cnt - 1]
+                    self._cnt += 1
+                    return self._dataset[self._cnt - 1]
             self.next = next
             
             def fetchall():
-                return self.__dataset
+                return self._dataset
             self.fetchall = fetchall
             
             def fetchone():
-                if self.__cnt >= len(self.__dataset):
+                if self._cnt >= len(self._dataset):
                     return None
                 else:
-                    self.__cnt += 1
-                    return self.__dataset[self.__cnt - 1]
+                    self._cnt += 1
+                    return self._dataset[self._cnt - 1]
             self.fetchone = fetchone
             
         elif sqlQuery == 'select * from dbf where delete_flag = true':
             # fetch all deleted rows
             def next():
                 while 1:
-                    if self.__cnt >= len(self.__dataset):
-                        self.__cnt = 0
+                    if self._cnt >= len(self._dataset):
+                        self._cnt = 0
                         raise StopIteration
                     else:
-                        self.__cnt += 1
-                        if self.__dataset[self.__cnt - 1][0] == True:
-                            return self.__dataset[self.__cnt - 1]
+                        self._cnt += 1
+                        if self._dataset[self._cnt - 1][0] == True:
+                            return self._dataset[self._cnt - 1]
             self.next = next
             
             def fetchall():
-                return [row for row in self.__dataset if row[0] == True]
+                return [row for row in self._dataset if row[0] == True]
             self.fetchall = fetchall
             
             def fetchone():
                 while 1:
-                    if self.__cnt >= len(self.__dataset):
+                    if self._cnt >= len(self._dataset):
                         return None
                     else:
-                        self.__cnt += 1
-                        if self.__dataset[self.__cnt - 1][0] == True:
-                            return self.__dataset[self.__cnt - 1]
+                        self._cnt += 1
+                        if self._dataset[self._cnt - 1][0] == True:
+                            return self._dataset[self._cnt - 1]
             self.fetchone = fetchone
             
         elif sqlQuery == 'select * from dbf where delete_flag = false':
             # fetch all not deleted rows
             def next():
                 while 1:
-                    if self.__cnt >= len(self.__dataset):
-                        self.__cnt = 0
+                    if self._cnt >= len(self._dataset):
+                        self._cnt = 0
                         raise StopIteration
                     else:
-                        self.__cnt += 1
-                        if self.__dataset[self.__cnt - 1][0] == False:
-                            return self.__dataset[self.__cnt - 1]
+                        self._cnt += 1
+                        if self._dataset[self._cnt - 1][0] == False:
+                            return self._dataset[self._cnt - 1]
             self.next = next
             
             def fetchall():
-                return [row for row in self.__dataset if row[0] == False]
+                return [row for row in self._dataset if row[0] == False]
             self.fetchall = fetchall
             
             def fetchone():
                 while 1:
-                    if self.__cnt >= len(self.__dataset):
+                    if self._cnt >= len(self._dataset):
                         return None
                     else:
-                        self.__cnt += 1
-                        if self.__dataset[self.__cnt - 1][0] == False:
-                            return self.__dataset[self.__cnt - 1]
+                        self._cnt += 1
+                        if self._dataset[self._cnt - 1][0] == False:
+                            return self._dataset[self._cnt - 1]
             self.fetchone = fetchone
             
         else:
@@ -239,7 +240,7 @@ class Cursor():
         return []
     
     def rowcount(self):
-        return len(self.__dataset)
+        return len(self._dataset)
     
     def execute(self, sql='', data=None):
         self.__analyzeSqlQuery(sql)
@@ -256,70 +257,93 @@ class Cursor():
     # *********************
     def delete(self):
         """ Mark current record as deleted """
-        self.__dataset[self.__cnt - 1][0] = True
+        self._dataset[self._cnt - 1][0] = True
     
     def undelete(self):
         """ Mark current record as not deleted """
-        self.__dataset[self.__cnt - 1][0] = False
+        self._dataset[self._cnt - 1][0] = False
     
     def zap(self):
         """ Marks all records as deleted """
-        for i in xrange(len(self.__dataset)):
-            self.__dataset[i][0] = True
+        for i in xrange(len(self._dataset)):
+            self._dataset[i][0] = True
     
     def pack(self):
         """ Remove all records marked as deleted. """
         # go from end to begin to avoid reindexing issues
-        i = len(self.__dataset) - 1
+        i = len(self._dataset) - 1
         while i >= 0:
-            if self.__dataset[i][0]:
-                del self.__dataset[i]
+            if self._dataset[i][0]:
+                del self._dataset[i]
             i -= 1
-    ### /pack()
+    
+    def toTxt(self, filename, delimiter=',', lineEnd='\r\n', header=False):
+        """Exports current selection to text file."""
+        fp = open(filename, 'wb')
+        
+        headerTxt = ''
+        if header:
+            headerData = []
+            for record in self._recordset:
+                headerData.append(record['name'])
+            headerTxt = delimiter.join(headerData) + lineEnd
+        fp.write(headerTxt)
+        
+        lineFormat = delimiter.join(
+            ['%s'] * len(self._recordset)
+            ) + lineEnd
+        
+        for line in self:
+            fp.write(lineFormat % tuple(line[1:]))
+        
+        fp.close()
+    
+    def toSqlite3(self, filename):
+        pass
     
     def insert(self, data):
         """
-        insert(data) - > void
+        None insert(data)
         inserts new data. data length has to be equal to number of columns
         (delete flag not included - it is always False for new records)
         and must have right order. File is not saved automatically!  
         """
-        if len(data) == len(self.__recordset):
+        if len(data) == len(self._recordset):
             i = 0
             
             # prepare record to insert
-            while i < len(self.__recordset):
-                if self.__recordset[i]['type'] == 'C':
-                    data[i] = self.__parent._format_C_put_(data[i], self.__recordset[i]['length'])
-                elif self.__recordset[i]['type'] == 'N':
-                    data[i] = self.__fmt_N_upd(data[i], self.__recordset[i]['length'], self.__recordset[i]['decimal'])
-                elif self.__recordset[i]['type'] == 'L':
+            while i < len(self._recordset):
+                if self._recordset[i]['type'] == 'C':
+                    data[i] = self._parent._format_C_put_(data[i], self._recordset[i]['length'])
+                elif self._recordset[i]['type'] == 'N':
+                    data[i] = self.__fmt_N_upd(data[i], self._recordset[i]['length'], self._recordset[i]['decimal'])
+                elif self._recordset[i]['type'] == 'L':
                     data[i] = self.__fmt_L_upd(data[i])
                 else:
                     #domyslnie traktuj jak string
-                    data[i] = self.__parent._format_C_put_(data[i], self.__recordset[i]['length'])
+                    data[i] = self._parent._format_C_put_(data[i], self._recordset[i]['length'])
                 i += 1
             
             # add delete flag to record
             data.insert(0, False)
             # add record
-            self.__dataset.append(data)
+            self._dataset.append(data)
     ### /insert
     
     def update(self, data):
         """ modify current record """
-        if len(data) == len(self.__recordset):
+        if len(data) == len(self._recordset):
             i = 0
-            while i < len(self.__recordset):
-                if self.__recordset[i]['type'] == 'C':
-                    self.__dataset[self.__cnt - 1][i+1] = self.__parent._format_C_put_(data[i], self.__recordset[i]['length'])
-                elif self.__recordset[i]['type'] == 'N':
-                    self.__dataset[self.__cnt - 1][i+1] = self.__fmt_N_upd(data[i], self.__recordset[i]['length'], self.__recordset[i]['decimal'])
-                elif self.__recordset[i]['type'] == 'L':
-                    self.__dataset[self.__cnt - 1][i+1] = self.__fmt_L_upd(data[i])
+            while i < len(self._recordset):
+                if self._recordset[i]['type'] == 'C':
+                    self._dataset[self._cnt - 1][i+1] = self._parent._format_C_put_(data[i], self._recordset[i]['length'])
+                elif self._recordset[i]['type'] == 'N':
+                    self._dataset[self._cnt - 1][i+1] = self.__fmt_N_upd(data[i], self._recordset[i]['length'], self._recordset[i]['decimal'])
+                elif self._recordset[i]['type'] == 'L':
+                    self._dataset[self._cnt - 1][i+1] = self.__fmt_L_upd(data[i])
                 else:
                     #domyslnie traktuj jak string
-                    self.__dataset[self.__cnt - 1] = self.__parent._format_C_put_(data[i], self.__recordset[i]['length'])
+                    self._dataset[self._cnt - 1] = self._parent._format_C_put_(data[i], self._recordset[i]['length'])
                 i += 1
     ### /update
     
@@ -332,25 +356,51 @@ class Cursor():
             return da
         raise DbfOnPyDataError('Invalid value for BOOL column: "%s"' % da)
     
-    def __fmt_N_upd(self, n, nlen, ndecimal):
-        # wartosc calkowita bez miejsc dziesietnych. Trzeba tez zapobiec bledom
-        # zwiazany z floating point precision, dlatego jest mnozone i dzielone przez 10.
-        asInteger = (n * 10 ** (ndecimal + 1)) / 10
-        # Gorna i dolna granica liczby na podstawie dlugosci, wartosci i miejsc
-        # dziesietnych. Poniewaz w DBF wielkosc pola musi uwzgledniac znak minus
-        # i ew. przecinek to np. dla liczby -12.44 wielkosc pola musi byc 6.
-        if ndecimal > 0:
-            # sa miejsca dzisietne wiec modyfikujemy o przecinek i znak minus
-            topBoundary = 10 ** (nlen - 1)
-            botBoundary = -1 * (10 ** (nlen - 1 - 1))
+    def __fmt_N_upd(self, num, numLen, decPlaces):
+        """Returns number if is allowed."""
+        
+        """
+        In dbf length of numeric field is total length with decimal separator
+        and minus sign so number -174.976 has length 8.
+        
+        In field of length 5 and 2 decimal places you can put numbers from
+        -9.99 to 99.99.
+        
+        My idea to check if number fits field is to multiple number by
+        10 to power "decimalPlaces". Eg. (length=6, decimal=2) number 853.8776
+        become 85387.76. Now i round it to get 85388.
+        
+        This number cannot be bigger than 10^fieldLength if there is no decimal
+        separator and 10^(fieldLength-1) if there is decimal separator (thats
+        because decimal separator takes one slot from total length).
+        
+        I my example length=6 and there is decimal separator (decimalPlaces>0) so
+        biggest number is 10^(6-1)=100000. 85388 is smaller than 100000 so it is ok.
+        
+        For the same field number 999.99998 is not ok because:
+        999.99998 * 10^decimalPlaces = 99999.998
+        after rounding i get 100000. 100000 == 10000 so number doesnt fit.
+        
+        For the same field number 1111.5 is not ok because:
+        1111.5 * 10^decimalPlaces = 111150
+        after rounding i get 111150. 111150 > 10000 so number doesnt fit.
+        """
+        
+        point = 1 - 0 ** decPlaces
+        
+        number = decimal.Decimal(str(num))
+        if number.is_zero():
+            return decimal.Decimal('0')
+        
+        number2 = (number * 10 ** (decPlaces)).quantize(decimal.Decimal('1')) 
+        #print number, number2, (10 ** (numLen - 1)), point
+        
+        if ((10 ** (numLen - point)) > number2 > (10 ** (numLen - point - 1) * (-1))):
+            return number
         else:
-            # brak miejsc dziesietnych wiec modyfikujemy tylko o znak minus
-            topBoundary = 10 ** (nlen)
-            botBoundary = -1 * (10 ** (nlen - 1))
-        #print '%s == %s, %s > %s > %s' % (math.floor(asInteger), asInteger, topBoundary, asInteger, botBoundary)
-        if math.floor(asInteger) == asInteger and (topBoundary > asInteger > botBoundary):
-            return n
-        raise DbfOnPyDataError('Invalid value (%s) for NUMERIC column. Expecting length: %s, decimal: %s' % (n,nlen,ndecimal))
+            raise DbfOnPyDataError('After rounding number %s does not fit to cell of lenght %s with %s decimal places.' % (num, numLen, decPlaces))
+            return None
+
 
 class Connection:
     #########################################################
@@ -358,7 +408,6 @@ class Connection:
     #########################################################
     
     def __init__(self, fname, cols):
-        self.version = '0.0.20100510.1.alpha'
         
         # jesli jest cols to znaczy ze masz stworzyc nowa pusta baze danych
         if cols != None:
@@ -376,8 +425,8 @@ class Connection:
         # inne
         self.currentFileName = ''
         self.header = {}
-        self.recordset = []
-        self.dataset = []
+        self._recordset = []
+        self._dataset = []
         self.idx = [{}] # indexes
         
         self.currentFileName = fname;
@@ -416,7 +465,7 @@ class Connection:
                 break
             else:
                 f.seek(-1,1) # after checking for delimiter go back 1 char
-                self.recordset.append(
+                self._recordset.append(
                     {
                         'name' : self._format_COLNAME_get_(f.read(10)),
                         'break' : f.read(1),
@@ -432,7 +481,11 @@ class Connection:
                 )
         
         # skip terminator 0x0d and database container 0x00
-        f.read(2)
+        f.read(1)
+        while 1:
+            if f.read(1) != '\x00':
+                f.seek(-1,1)
+                break
         
         # data
         
@@ -441,10 +494,9 @@ class Connection:
         # tutaj przygotowujemy i prekompilujemy funkcje, dzieki czemu
         # przy duzych plikach przyspieszamy wczytywanie do 50%!
         dataAppendConf = []
-        i = 1
-        c = 1 #index w rekordzie tymczasowym
+        i = 1 # @ 0 is delete flag
         
-        for j in self.recordset:
+        for j in self._recordset:
             le = j['length']
             if j['type'] == 'C':
                 dataAppendConf.append('strline[%s:%s].rstrip()' % (i, i+le))
@@ -455,13 +507,12 @@ class Connection:
             else:
                 dataAppendConf.append('strline[%s:%s]' % (i, i+le))
             i += le
-            c += 1
         
         compilestr  = ''\
             '\ndef appendfuncdynamic(self, strline):'\
             '\n    temp = False;'\
             '\n    if strline[0] == self.DATA_DBF_DELFLAG_TRUE: temp = True;'\
-            '\n    self.dataset.append([temp, %s])' % ','.join(dataAppendConf)
+            '\n    self._dataset.append([temp, %s])' % ','.join(dataAppendConf)
         
         exec(compilestr)
         
@@ -492,13 +543,13 @@ class Connection:
         }
         
         # clear current recordset info (columns definitions)...
-        self.recordset = []
+        self._recordset = []
         
         # ... and add new one.
         for row in cols:
             # ('name', 'type', length, decimal)
             ctypes = ('L','N','C','D')
-            cname = row[0].upper()
+            cname = '%s%s' % (row[0].upper(), (10 - len(row[0])) * '\x00')
             clen = 1
             cdec = 0
             ctype = row[1].upper()
@@ -522,7 +573,7 @@ class Connection:
             except:
                 pass
             
-            self.recordset.append(
+            self._recordset.append(
                 {
                     'name' : cname,
                     'break' : '\x00',
@@ -537,7 +588,7 @@ class Connection:
                 }
             )
         # wyczysc stare dane
-        self.dataset = [] 
+        self._dataset = [] 
         self.commit(fname)
     ### /__createEmptyDB
     
@@ -548,19 +599,19 @@ class Connection:
         
         # recordset
         dataFieldLength = 1 #delete flag
-        _recordset = ''
-        for i in xrange(len(self.recordset)):
-            _recordset += self._format_COLNAME_put_(self.recordset[i]['name'])
-            _recordset += self.recordset[i]['break']
-            _recordset += self.recordset[i]['type']
-            _recordset += self.recordset[i]['displacement']
-            _recordset += self._intToByte_(self.recordset[i]['length'], 1)
-            _recordset += self._intToByte_(self.recordset[i]['decimal'], 1)
-            _recordset += self.recordset[i]['flag']
-            _recordset += self.recordset[i]['autoincrement']
-            _recordset += self.recordset[i]['step']
-            _recordset += self.recordset[i]['reserved']
-            dataFieldLength += self.recordset[i]['length']
+        _recordset = b''
+        for i in xrange(len(self._recordset)):
+            _recordset += self._format_COLNAME_put_(self._recordset[i]['name'])
+            _recordset += self._recordset[i]['break']
+            _recordset += self._recordset[i]['type']
+            _recordset += self._recordset[i]['displacement']
+            _recordset += self._intToByte_(self._recordset[i]['length'], 1)
+            _recordset += self._intToByte_(self._recordset[i]['decimal'], 1)
+            _recordset += self._recordset[i]['flag']
+            _recordset += self._recordset[i]['autoincrement']
+            _recordset += self._recordset[i]['step']
+            _recordset += self._recordset[i]['reserved']
+            dataFieldLength += self._recordset[i]['length']
         
         # terminator and db container
         _TerminatorAndDBContainer = b'\x0d\x00'
@@ -570,7 +621,7 @@ class Connection:
         _header = ''
         _header += self.header['fileType']
         _header += self._lastUpdate_(time.strftime("%y%m%d"))# last update
-        _header += self._intToByte_(len(self.dataset),4) # num of records
+        _header += self._intToByte_(len(self._dataset),4) # num of records
         _header += self._intToByte_(32 + len(_TerminatorAndDBContainer) + len(_recordset), 2) # 
         _header += self._intToByte_(dataFieldLength,2) # length of data record
         _header += self.header['reserved1']
@@ -582,7 +633,7 @@ class Connection:
         _header = struct.pack('<c3sIHH16scc2s', 
             self.header['fileType'],
             self._lastUpdate_(time.strftime("%y%m%d")),
-            len(self.dataset),
+            len(self._dataset),
             32 + len(_TerminatorAndDBContainer) + len(_recordset),
             dataFieldLength,
             self.header['reserved1'],
@@ -595,25 +646,25 @@ class Connection:
         dbf.write(_header + _recordset + _TerminatorAndDBContainer)
         
         # save data        
-        for rowdata in self.dataset:
+        for rowdata in self._dataset:
             _data = ''
             columnNo = 0
             for field in rowdata:
                 if columnNo == 0:
                     _data += self.__format_DELETEFLAG_put(field)
                 else:
-                    if self.recordset[columnNo-1]['type'] == 'N':
+                    if self._recordset[columnNo-1]['type'] == 'N':
                         _data += self._format_N_put_(
                             field,
-                            self.recordset[columnNo-1]['length'],
-                            self.recordset[columnNo-1]['decimal']
+                            self._recordset[columnNo-1]['length'],
+                            self._recordset[columnNo-1]['decimal']
                         )
-                    elif self.recordset[columnNo-1]['type'] == 'L':
+                    elif self._recordset[columnNo-1]['type'] == 'L':
                         _data += self._format_L_put_(field)
                     else:
                         _data += self._format_C_put_(
                             field,
-                            self.recordset[columnNo-1]['length']
+                            self._recordset[columnNo-1]['length']
                         )
                 columnNo += 1
             dbf.write(_data)
@@ -649,14 +700,11 @@ class Connection:
         return dataString.rstrip()
     
     def _format_N_put_(self, dataString, dataLength, decimalPlaces):
-        if int(decimalPlaces) > 0:
-            return ("% " + str(dataLength) + "s") % (("%.0" + str(decimalPlaces) + "f") % float(dataString))
-        else:
-            return ("% " + str(dataLength) + "s") % int(dataString)
+        return ("% " + str(dataLength) + "s") % (("%.0" + str(decimalPlaces) + "f") % decimal.Decimal((dataString)))
     
     def _format_N_get_(self, dataString):
         try:
-            return float(dataString)
+            return decimal.Decimal(dataString)
         except:
             return 0
     
@@ -683,7 +731,7 @@ class Connection:
         pass
     
     def _format_COLNAME_get_(self, colname):
-        return colname.replace('\x00', '')
+        return colname[0:colname.find('\x00')]
 
     def _format_COLNAME_put_(self, dataString):
         if len(dataString) > 10:
